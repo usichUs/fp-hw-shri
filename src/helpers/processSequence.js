@@ -14,38 +14,66 @@
  * Иногда промисы от API будут приходить в состояние rejected, (прямо как и API в реальной жизни)
  * Ответ будет приходить в поле {result}
  */
- import Api from '../tools/api';
 
- const api = new Api();
+import Api from "../tools/api";
+import { modulo, lt, gt, allPass, test } from "ramda";
 
- /**
-  * Я – пример, удали меня
-  */
- const wait = time => new Promise(resolve => {
-     setTimeout(resolve, time);
- })
+const processSequence = ({ value, writeLog, handleSuccess, handleError }) => {
+  const isValidInput = allPass([
+    (val) => typeof val === "string",
+    (val) => gt(val.length, 2) && lt(val.length, 10),
+    (val) => test(/^[0-9]+\.?[0-9]*$/, val),
+    (val) => !isNaN(Number(val)),
+    (val) => Number(val) > 0,
+  ]);
 
- const processSequence = ({value, writeLog, handleSuccess, handleError}) => {
-     /**
-      * Я – пример, удали меня
-      */
-     writeLog(value);
+  writeLog(value);
 
-     api.get('https://api.tech/numbers/base', {from: 2, to: 10, number: '01011010101'}).then(({result}) => {
-         writeLog(result);
-     });
+  if (!isValidInput(value)) {
+    handleError("ValidationError");
+    return;
+  }
 
-     wait(2500).then(() => {
-         writeLog('SecondLog')
+  const api = new Api();
 
-         return wait(1500);
-     }).then(() => {
-         writeLog('ThirdLog');
+  const roundedValue = Math.round(Number(value));
+  writeLog(roundedValue);
 
-         return wait(400);
-     }).then(() => {
-         handleSuccess('Done');
-     });
- }
+  api
+    .get("https://api.tech/numbers/base", {
+      number: roundedValue,
+      from: 10,
+      to: 2,
+    })
+    .then((response) => {
+      if (!response || !response.result) {
+        throw new Error("Invalid API response");
+      }
+
+      const binary = response.result;
+      writeLog(binary);
+
+      const digitCount = binary.length;
+      writeLog(digitCount);
+
+      const squared = digitCount ** 2;
+      writeLog(squared);
+
+      const remainder = modulo(squared, 3);
+      writeLog(remainder);
+
+      return api.get(`https://animals.tech/${remainder}`, {});
+    })
+    .then((response) => {
+      if (!response || !response.result) {
+        throw new Error("Invalid animal response");
+      }
+      handleSuccess(response.result);
+    })
+    .catch((error) => {
+      writeLog(`API Error: ${error.message}`);
+      handleError("NetworkError");
+    });
+};
 
 export default processSequence;
